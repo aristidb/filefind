@@ -48,3 +48,6 @@ path GLOB
 Type restrictions:
 isfile
 isdirectory
+
+Label:
+label TEXT EXPR
