@@ -2,6 +2,8 @@
 
 Basic type: "node set" of files. Operators are automatically lifted onto operators, as in the Applicative of (->). Values are similarly automatically lifted to constant functions.
 
+X: Limit to one directory, to avoid set comparison problems?
+
 Syntax description rules: Keywords are lower-case, "variables" are upper-case.
 
 Parentheses for disambiguation.
