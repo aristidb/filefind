@@ -1,0 +1,50 @@
+"Like relational algebra."
+
+Basic type: "node set" of files. Operators are automatically lifted onto operators, as in the Applicative of (->). Values are similarly automatically lifted to constant functions.
+
+Syntax description rules: Keywords are lower-case, "variables" are upper-case.
+
+Parentheses for disambiguation.
+
+Strings: either bare words, or "" with standard backslash escape sequences.
+Q: Maybe use other escape character?
+
+Unary operator application:
+UOP VALUE
+
+Binary operator:
+VALUE BOP VALUE
+OPEXPR BOP OPEXPR
+
+Recursive directory list:
+dir NAME
+directory NAME
+deep EXPR
+
+Non-recursive file/directory:
+return NAME
+
+Depth limitation:
+root EXPR
+toplevel EXPR
+depth N EXPR
+
+Logical:
+not X
+- X
+X and Y
+X * Y
+X or Y
+X + Y 
+X minus Y
+X - Y
+
+Name restrictions:
+name GLOB
+(filter files by the name)
+path GLOB
+(filter directories, at any depth)
+
+Type restrictions:
+isfile
+isdirectory
