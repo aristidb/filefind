@@ -14,14 +14,14 @@ recurse action dir = bracket (openDirStream dir) closeDirStream go
         name <- readDirStream stream
         case name of
           [] -> return ()
-          _ -> do let path = dir </> name
-                  case name of
-                    "." -> return ()
-                    ".." -> return ()
-                    _ -> do action path
-                            stat <- getFileStatus path
-                            when (isDirectory stat) $ recurse action path
-                  go stream
+          _ -> (case name of
+                  "." -> return ()
+                  ".." -> return ()
+                  _ -> do let path = dir </> name
+                          action path
+                          stat <- getFileStatus path
+                          when (isDirectory stat) $ recurse action path)
+               >> go stream
 
 main :: IO ()
 main = do
