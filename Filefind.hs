@@ -86,6 +86,9 @@ union a b Positive = \fi -> let TestResult{trAction=a1,trDescend=d1} = a Positiv
                                    }
 union a b Negative = (negate a `intersection` negate b) Positive
 
+difference :: Test -> Test -> Test
+difference a b = a `intersection` negate b
+
 makeFileInfo :: FilePath -> IO FileInfo
 makeFileInfo path = makeFileInfo' (takeFileName path) path
 
@@ -113,10 +116,18 @@ traverse action test fi@FileInfo{fiPath=path}
                     _ -> traverse action nextTest =<< makeFileInfo' name (path </> name)
                   go nextTest stream
 
+testWithNegation :: Test -> FilePath -> IO ()
+testWithNegation t dir = do
+  fi <- makeFileInfo dir
+  putStrLn "Positive:"
+  traverse putStrLn t fi
+  putStrLn "\nNegative:"
+  traverse putStrLn (negate t) fi
+
 main :: IO ()
 main = do
   args <- getArgs
   let dir = case args of
               [] -> "."
               (x:_) -> x
-  traverse putStrLn (cut $ testName "x") =<< makeFileInfo dir
+  testWithNegation (testName "x" `difference` cut (testName "x")) dir
