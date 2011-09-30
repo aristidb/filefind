@@ -3,11 +3,12 @@ module Main (main) where
 
 import Control.Exception
 import Control.Monad
+import Data.Maybe
+import Prelude                hiding (negate)
 import System.Environment     (getArgs)
 import System.FilePath
 import System.Posix.Directory
 import System.Posix.Files
-import Prelude hiding (negate)
 
 data Positivity
     = Positive
@@ -66,25 +67,51 @@ cut t Negative fi = case t Positive fi of
                       TestResult{trAction=True} -> TestResult{trAction=False, trDescend=Just allContents}
                       TestResult{trAction=False,trDescend=d} -> TestResult{trAction=True, trDescend=fmap (negate . cut) d}
 
-recurse :: (FilePath -> IO ()) -> Test -> FilePath -> IO ()
-recurse action test dir = bracket (openDirStream dir) closeDirStream go
+intersection :: Test -> Test -> Test
+intersection a b Positive = \fi -> let TestResult{trAction=a1,trDescend=d1} = a Positive fi
+                                       TestResult{trAction=a2,trDescend=d2} = b Positive fi
+                                   in TestResult{trAction=a1&&a2, trDescend=liftM2 intersection d1 d2}
+intersection a b Negative = (negate a `union` negate b) Positive
+
+union :: Test -> Test -> Test
+union a b Positive = \fi -> let TestResult{trAction=a1,trDescend=d1} = a Positive fi
+                                TestResult{trAction=a2,trDescend=d2} = b Positive fi
+                            in TestResult{
+                                     trAction  = a1 || a2
+                                   , trDescend = case (d1,d2) of
+                                                   (Nothing,Nothing) -> Nothing
+                                                   (_,Nothing) -> d1
+                                                   (Nothing,_) -> d2
+                                                   (Just x, Just y) -> Just (x `union` y)
+                                   }
+union a b Negative = (negate a `intersection` negate b) Positive
+
+makeFileInfo :: FilePath -> IO FileInfo
+makeFileInfo path = makeFileInfo' (takeFileName path) path
+
+makeFileInfo' :: FilePath -> FilePath -> IO FileInfo
+makeFileInfo' name path = do
+  stat <- getFileStatus path
+  return FileInfo{fiName=name, fiPath=path, fiStatus=stat}
+
+traverse :: (FilePath -> IO ()) -> Test -> FileInfo -> IO ()
+traverse action test fi@FileInfo{fiPath=path}
+    = do let TestResult{..} = test Positive fi
+         when trAction $ action path
+         when (isDirectory $ fiStatus fi) $ 
+              case trDescend of
+                Just nextTest -> bracket (openDirStream path) closeDirStream (go nextTest)
+                Nothing -> return ()
     where
-      go stream = do
+      go nextTest stream = do
         name <- readDirStream stream
         case name of
           [] -> return ()
           _ -> do case name of
                     "." -> return ()
                     ".." -> return ()
-                    _ -> do let path = dir </> name
-                            stat <- getFileStatus path
-                            let fi = FileInfo { fiName = name, fiPath = path, fiStatus = stat }
-                            let TestResult{..} = test Positive fi
-                            when trAction $ action path
-                            when (isDirectory stat) $ case trDescend of
-                              Just nextTest -> recurse action nextTest path
-                              Nothing -> return ()
-                  go stream
+                    _ -> traverse action nextTest =<< makeFileInfo' name (path </> name)
+                  go nextTest stream
 
 main :: IO ()
 main = do
@@ -92,4 +119,4 @@ main = do
   let dir = case args of
               [] -> "."
               (x:_) -> x
-  recurse putStrLn (cut $ testName "x") dir
+  traverse putStrLn (cut $ testName "x") =<< makeFileInfo dir
