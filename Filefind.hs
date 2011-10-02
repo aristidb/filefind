@@ -164,7 +164,16 @@ varname :: Parser String
 varname = (:) <$> oneOf ('_' : ['A'..'Z']++['a'..'z']) <*> many (oneOf $ '_' : ['A'..'Z']++['a'..'z']++['0'..'9'])
 
 word :: Parser String
-word = variable <|> quote <|> bareword
+word = (variable <|> quote <|> bareword) <* spaces
+
+expression :: Parser Test
+expression = chainl factor expop allContents
+    where
+      expop = (<* spaces) $ union <$ char '+'
+                            <|> intersection <$ char '&'
+                            <|> difference <$ oneOf "%\\"
+      factor = name <|> between (char '(' <* spaces) (char ')' <* spaces) expression
+      name = testName <$> word
 
 main :: IO ()
 main = do
