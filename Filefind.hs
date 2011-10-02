@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main (main) where
 
+import Control.Applicative    hiding (many)
 import Control.Exception
 import Control.Monad
 import Data.Maybe
@@ -9,6 +10,7 @@ import System.Environment     (getArgs)
 import System.FilePath
 import System.Posix.Directory
 import System.Posix.Files
+import Text.Parsec            hiding ((<|>))
 
 data Positivity
     = Positive
@@ -123,6 +125,18 @@ testWithNegation t dir = do
   traverse putStrLn t fi
   putStrLn "\nNegative:"
   traverse putStrLn (negate t) fi
+
+parseQuote :: Parsec String () String
+parseQuote = quote '"' <|> quote '\''
+    where quote q = between (char q <?> "starting quote <" ++ q : ">") (char '"' <?> "ending quote <" ++ q : ">") innerQuote
+              where innerQuote = many ((escaped <|> normal) <?> "text")
+                    escaped = do char '~'
+                                 c <- oneOf "~'\"0n"
+                                 return $ case c of
+                                            '0' -> '\0'
+                                            'n' -> '\n'
+                                            _   -> c
+                    normal = noneOf [q]
 
 main :: IO ()
 main = do
