@@ -1,16 +1,22 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main (main) where
 
-import Control.Applicative    hiding (many)
-import Control.Exception
-import Control.Monad
-import Data.Maybe
-import Prelude                hiding (negate)
-import System.Environment     (getArgs)
-import System.FilePath
-import System.Posix.Directory
-import System.Posix.Files
-import Text.Parsec            hiding ((<|>))
+import           Control.Applicative    hiding (many)
+import           Control.Exception
+import           Control.Monad
+import           Data.Char
+import           Data.Maybe
+import           Prelude                hiding (negate)
+import           System.Environment     (getArgs)
+import           System.FilePath
+import           System.Posix.Directory
+import           System.Posix.Files
+import           Text.Parsec            hiding ((<|>))
+import qualified Data.Map               as M
+
+type Variables = M.Map String String
+
+type Parser a = Parsec String Variables a
 
 data Positivity
     = Positive
@@ -126,17 +132,39 @@ testWithNegation t dir = do
   putStrLn "\nNegative:"
   traverse putStrLn (negate t) fi
 
-parseQuote :: Parsec String () String
-parseQuote = quote '"' <|> quote '\''
-    where quote q = between (char q <?> "starting quote <" ++ q : ">") (char '"' <?> "ending quote <" ++ q : ">") innerQuote
-              where innerQuote = many ((escaped <|> normal) <?> "text")
+quote :: Parser String
+quote = xquote '"' <|> xquote '\''
+    where xquote q = between (char q) (char q) innerQuote <?> "quote <" ++ q : ">"
+              where innerQuote = concat <$> many ((escaped <|> interpolated <|> normal) <?> "text")
                     escaped = do char '~'
-                                 c <- oneOf "~'\"0n"
+                                 c <- oneOf "$~'\"0n"
                                  return $ case c of
-                                            '0' -> '\0'
-                                            'n' -> '\n'
-                                            _   -> c
-                    normal = noneOf [q]
+                                            '0' -> "\0"
+                                            'n' -> "\n"
+                                            _   -> [c]
+                    normal = (:[]) <$> noneOf [q]
+                    interpolated = do char '$'
+                                      name <- between (char '{') (char '}') varname <|> varname
+                                      findVar name
+
+bareword :: Parser String
+bareword = many1 (oneOf $ "./-" ++ filter (\c -> isLetter c || isNumber c) [minBound..maxBound]) <?> "bareword"
+
+variable :: Parser String
+variable = do char '$'
+              findVar =<< varname
+
+findVar :: String -> Parser String
+findVar name = do vars <- getState
+                  case M.lookup name vars of
+                    Nothing -> fail ("Unknown variable " ++ name)
+                    Just x -> return x
+
+varname :: Parser String
+varname = (:) <$> oneOf ('_' : ['A'..'Z']++['a'..'z']) <*> many (oneOf $ '_' : ['A'..'Z']++['a'..'z']++['0'..'9'])
+
+word :: Parser String
+word = variable <|> quote <|> bareword
 
 main :: IO ()
 main = do
