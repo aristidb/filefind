@@ -81,6 +81,10 @@ intersection a b Positive = \fi -> let TestResult{trAction=a1,trDescend=d1} = a 
                                    in TestResult{trAction=a1&&a2, trDescend=liftM2 intersection d1 d2}
 intersection a b Negative = (negate a `union` negate b) Positive
 
+-- lolwut
+compose :: Test -> Test -> Test
+compose = intersection
+
 union :: Test -> Test -> Test
 union a b Positive = \fi -> let TestResult{trAction=a1,trDescend=d1} = a Positive fi
                                 TestResult{trAction=a2,trDescend=d2} = b Positive fi
